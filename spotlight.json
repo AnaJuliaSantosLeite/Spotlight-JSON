@@ -1,0 +1,59 @@
+//Tela dos Detalhes do Evento, parte de inscrição
+{
+    "inscricao": {
+      "nome": "Lucas Andrade",
+      "idade": 27,
+      "cidade": "São Paulo",
+      "estado": "SP",
+      "email": "lucas.andrade@email.com",
+      "trabalho_artistico": "Cantor e compositor",
+      "nome_artistico": "Lucas A.",
+    // entre outros
+    }
+  }
+
+//Cadastro de Eventos
+  {
+    "evento": {
+      "banner": {
+        "url": "https://exemplo.com/banners/evento123.jpg",
+        "alt_text": "Banner do Evento de Tecnologia 2023",
+        }
+      },
+      "detalhes": {
+        "nome": "Conferência de Tecnologia 2023",
+        "descricao": "Evento anual reunindo os maiores especialistas em tecnologia do país.",
+        "data": {
+          "inicio": "2023-11-15T09:00:00-03:00",
+          "fim": "2023-11-17T18:00:00-03:00"
+        },
+        "local": {
+          "nome": "Centro de Convenções",
+          "endereco_completo": "Av. Paulista, 1000, São Paulo - SP"
+        },
+  …
+      },
+      "botao_acao": {
+        "criar_evento": {
+          "texto": "Publicar Evento",
+          "estilo": "destaque",
+          "confirmacao": "Tem certeza que deseja publicar?"
+        }
+      }
+    }
+  }  
+
+//Cadastro de Grupo
+  {
+    "grupo":[
+      {
+           "nome_grupo": "eventos",
+            "desc_grupo": "grupo de eventos",
+             "avatar_grupo": "avatar.png",
+             "canais_grupo": ["canal 1"]
+         }
+      ]
+  }
+
+//spotlight - T1 G9
+// 3 JSON
