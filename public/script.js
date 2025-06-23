@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const groupEditForm = document.getElementById('groupEditForm');
     const cancelEditGroupBtn = document.getElementById('cancelEditGroupBtn');
 
-
     let allEditaisData = [];
     let usuarioLogado = null;
     try {
@@ -58,10 +57,46 @@ document.addEventListener('DOMContentLoaded', function () {
         sessionStorage.removeItem('usuarioLogado');
     }
 
+    document.addEventListener('DOMContentLoaded', () => {
+        if (usuarioLogado) {
+            const userSubscriptions = JSON.parse(localStorage.getItem('userSubscriptions')) || {};
+            Object.keys(userSubscriptions).forEach(editalId => {
+                if (userSubscriptions[editalId]) {
+                    const btn = document.querySelector(`[data-edital-id="${editalId}"] .btn-inscricao`);
+                    if (btn) btn.textContent = 'Cancelar Inscrição';
+                }
+            });
+        }
+    });
+
     function generateRandomPicsumUrl(width = 60, height = 60) {
         return `https://picsum.photos/${width}/${height}?random=${Math.floor(Math.random() * 1000)}`;
     }
     
+    // Função para verificar se o usuário é artista
+    function isArtista() {
+        return usuarioLogado && usuarioLogado.tipo === 'artista';
+    }
+
+    // Função para esconder botões CRUD para artistas
+    function hideCrudButtonsForArtista() {
+        if (isArtista()) {
+            // Esconde botões de editar/excluir eventos
+            if (btnEditarSobreposicao) btnEditarSobreposicao.style.display = 'none';
+            if (btnExcluirSobreposicao) btnExcluirSobreposicao.style.display = 'none';
+            
+            // Esconde botão de novo grupo
+            if (novoGrupoBtn) novoGrupoBtn.style.display = 'none';
+            
+            // Esconde botões de editar/excluir grupos
+            if (editGroupBtn) editGroupBtn.style.display = 'none';
+            if (deleteGroupBtn) deleteGroupBtn.style.display = 'none';
+            
+            // Esconde botão de criar grupo
+            if (criarGrupoBtn) criarGrupoBtn.style.display = 'none';
+        }
+    }
+
     async function renderGroupsForEdital(editalId) {
         groupListContainer.innerHTML = 'Carregando grupos...';
         try {
@@ -103,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('groupEditAvatar').value = group.imagem;
 
             const actionButtons = document.getElementById('groupActionButtons');
-            if (usuarioLogado && usuarioLogado.produtor) {
+            if (usuarioLogado && usuarioLogado.produtor && !isArtista()) {
                 actionButtons.classList.remove('hidden');
             } else {
                 actionButtons.classList.add('hidden');
@@ -254,7 +289,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const isSubscribed = edital.inscritos && edital.inscritos.includes(usuarioLogado.id);
+        // Verifica tanto o localStorage quanto a API
+        const userSubscriptions = JSON.parse(localStorage.getItem('userSubscriptions')) || {};
+        const isSubscribed = userSubscriptions[edital.id] || 
+                           (edital.inscritos && edital.inscritos.includes(usuarioLogado.id));
 
         if (isSubscribed) {
             btnInscricao.textContent = 'Cancelar Inscrição';
@@ -292,14 +330,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 successMessage = 'Inscrito com sucesso!';
             }
 
+            // 1. Atualiza no JSON Server (API)
             const patchResponse = await fetch(`http://localhost:3000/noticias/${currentEditalId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ inscritos: novosInscritos })
             });
-
             if (!patchResponse.ok) throw new Error('A operação falhou.');
 
+            // 2. Atualiza no localStorage (persistência)
+            const userSubscriptions = JSON.parse(localStorage.getItem('userSubscriptions')) || {};
+            userSubscriptions[currentEditalId] = !isSubscribed; // true = inscrito, false = cancelado
+            localStorage.setItem('userSubscriptions', JSON.stringify(userSubscriptions));
+
+            // 3. Atualiza a UI
             Swal.fire('Sucesso!', successMessage, 'success');
             updateSubscriptionStatus({ ...edital, inscritos: novosInscritos });
 
@@ -408,11 +452,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         eventoSobreposicao.classList.add('overlay-visible');
 
                         const crudButtons = document.querySelector('.caixa-inscricao .produtor-only');
-                        if (crudButtons && usuarioLogado && usuarioLogado.produtor) {
+                        if (crudButtons && usuarioLogado && usuarioLogado.produtor && !isArtista()) {
                             crudButtons.style.display = 'flex';
                         } else if (crudButtons) {
                             crudButtons.style.display = 'none';
                         }
+                        
+                        // Esconde botões para artistas
+                        hideCrudButtonsForArtista();
                     }
                 });
             });
@@ -427,6 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             renderizarGruposDaSidebar();
             updateProdutorElementsVisibility();
+            hideCrudButtonsForArtista(); // Aplica as restrições para artistas
         } catch (error) {
             console.error("Erro ao carregar editais:", error);
         }
@@ -476,20 +524,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (novoGrupoBtn) {
         novoGrupoBtn.addEventListener('click', function () {
-            if (usuarioLogado && usuarioLogado.produtor) {
+            if (usuarioLogado && usuarioLogado.produtor && !isArtista()) {
                 mostrarFormulario();
             } else {
                 Swal.fire({
-                    title: 'Login Necessário',
-                    text: 'Você precisa estar logado como produtor para adicionar eventos. Deseja fazer login agora?',
-                    icon: 'info',
-                    showCancelButton: true,
-                    confirmButtonText: 'Sim, fazer login',
-                    cancelButtonText: 'Cancelar'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = 'login.html';
-                    }
+                    title: 'Acesso Negado',
+                    text: 'Você precisa estar logado como produtor para adicionar eventos.',
+                    icon: 'info'
                 });
             }
         });
@@ -529,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function () {
     eventoForm.addEventListener('submit', async function (event) {
         event.preventDefault();
 
-        if (!usuarioLogado || !usuarioLogado.produtor) {
+        if (!usuarioLogado || !usuarioLogado.produtor || isArtista()) {
             Swal.fire('Permissão Negada','Apenas produtores podem adicionar/editar eventos.','error');
             return;
         }
@@ -576,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     async function editarEvento(id) {
-        if (!usuarioLogado || !usuarioLogado.produtor) {
+        if (!usuarioLogado || !usuarioLogado.produtor || isArtista()) {
             Swal.fire('Permissão Negada','Apenas produtores podem editar eventos.','error');
             return;
         }
@@ -593,7 +634,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function excluirEvento(id) {
-        if (!usuarioLogado || !usuarioLogado.produtor) {
+        if (!usuarioLogado || !usuarioLogado.produtor || isArtista()) {
             Swal.fire('Permissão Negada', 'Apenas produtores podem excluir eventos.', 'error');
             return;
         }
@@ -640,7 +681,7 @@ document.addEventListener('DOMContentLoaded', function () {
             Swal.fire('Acesso Negado', 'Você precisa fazer login para criar um grupo.', 'warning');
             return;
         }
-        if (!usuarioLogado.produtor) {
+        if (!usuarioLogado.produtor || isArtista()) {
             Swal.fire('Acesso Negado', 'Apenas produtores podem criar grupos.', 'error');
             return;
         }
@@ -698,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateProdutorElementsVisibility() {
         const produtorElements = document.querySelectorAll('.produtor-only');
-        if (usuarioLogado && usuarioLogado.produtor) {
+        if (usuarioLogado && usuarioLogado.produtor && !isArtista()) {
             produtorElements.forEach(el => el.style.display = 'flex');
         } else {
             produtorElements.forEach(el => el.style.display = 'none');
@@ -718,4 +759,5 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     carregarEditais();
+    hideCrudButtonsForArtista(); // Aplica as restrições para artistas ao carregar a página
 });
